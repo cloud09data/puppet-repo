@@ -1,1 +1,153 @@
-sample-file
+text
+dummy_service/
+├── manifests/
+│   ├── init.pp
+│   ├── install.pp
+│   ├── config.pp
+│   ├── repo.pp
+│   └── service.pp
+├── templates/
+│   ├── env.erb
+│   └── repo.erb
+└── files/
+    └── dummy_service.repo
+Detailed Manifests
+manifests/init.pp:
+puppet
+class dummy_service (
+  # Service Basic Configuration
+  String $service_name = 'dummy_service',
+  String $package_name = 'dummy-service',
+  String $package_version = 'latest',
+  String $install_path = '/opt/dummy_service',
+  
+  # Repository Configuration
+  String $repo_baseurl = 'https://repos.example.com/dummy_service',
+  String $repo_gpgkey = 'https://repos.example.com/RPM-GPG-KEY',
+  
+  # Python Configuration
+  String $python_version = '3.11',
+  Boolean $manage_python = true,
+  
+  # LDAP Configuration
+  String $ldap_server = 'ldap.example.com',
+  Integer $ldap_port = 389,
+  String $ldap_bind_dn = 'cn=admin,dc=example,dc=com',
+  String $ldap_bind_password = '',
+  String $ldap_search_base = 'dc=example,dc=com',
+  
+  # MongoDB Configuration
+  String $mongodb_host = 'localhost',
+  Integer $mongodb_port = 27017,
+  String $mongodb_database = 'dummy_db',
+  String $mongodb_username = '',
+  String $mongodb_password = '',
+  
+  # Service Management
+  Boolean $service_enable = true,
+  Enum['running', 'stopped'] $service_ensure = 'running',
+) {
+  # Enforce class order of operations
+  class { '::dummy_service::repo': }
+  -> class { '::dummy_service::install': }
+  -> class { '::dummy_service::config': }
+  ~> class { '::dummy_service::service': }
+}
+manifests/repo.pp:
+puppet
+class dummy_service::repo {
+  # Manage repository configuration
+  yumrepo { 'dummy_service_repo':
+    ensure   => 'present',
+    baseurl  => $::dummy_service::repo_baseurl,
+    descr    => 'Dummy Service Repository',
+    enabled  => 1,
+    gpgcheck => 1,
+    gpgkey   => $::dummy_service::repo_gpgkey,
+  }
+}
+manifests/install.pp:
+puppet
+class dummy_service::install {
+  # Manage Python installation if required
+  if $::dummy_service::manage_python {
+    package { ['python3.11', 'python3.11-venv', 'python3.11-devel']:
+      ensure => present,
+    }
+  }
+
+  # Install service package
+  package { $::dummy_service::package_name:
+    ensure  => $::dummy_service::package_version,
+    require => Yumrepo['dummy_service_repo'],
+  }
+
+  # Ensure installation directory exists
+  file { $::dummy_service::install_path:
+    ensure => directory,
+    owner  => 'dummy_service',
+    group  => 'dummy_service',
+    mode   => '0755',
+  }
+}
+manifests/config.pp:
+puppet
+class dummy_service::config {
+  # Create .env configuration file
+  file { "${::dummy_service::install_path}/.env":
+    ensure  => file,
+    content => template('dummy_service/env.erb'),
+    owner   => 'dummy_service',
+    group   => 'dummy_service',
+    mode    => '0600',
+  }
+
+  # Additional configuration management can be added here
+}
+manifests/service.pp:
+puppet
+class dummy_service::service {
+  # Manage systemd service
+  service { $::dummy_service::service_name:
+    ensure    => $::dummy_service::service_ensure,
+    enable    => $::dummy_service::service_enable,
+    provider  => 'systemd',
+    subscribe => [
+      File["${::dummy_service::install_path}/.env"],
+      Package[$::dummy_service::package_name]
+    ],
+  }
+}
+Template Files
+templates/env.erb:
+text
+# LDAP Configuration
+LDAP_SERVER=<%= @ldap_server %>
+LDAP_PORT=<%= @ldap_port %>
+LDAP_BIND_DN=<%= @ldap_bind_dn %>
+LDAP_BIND_PASSWORD=<%= @ldap_bind_password %>
+LDAP_SEARCH_BASE=<%= @ldap_search_base %>
+
+# MongoDB Configuration
+MONGODB_HOST=<%= @mongodb_host %>
+MONGODB_PORT=<%= @mongodb_port %>
+MONGODB_DATABASE=<%= @mongodb_database %>
+MONGODB_USERNAME=<%= @mongodb_username %>
+MONGODB_PASSWORD=<%= @mongodb_password %>
+
+# Service-specific configurations can be added here
+Key Features and Best Practices
+Module Design
+Modular Structure: Separated into distinct manifests for different concerns
+Parameterized Configuration: Flexible input for various service parameters
+Dependency Management: Enforced class execution order
+Repository Management: Configurable repository setup
+Service Configuration: Environment-based configuration
+Usage Example
+puppet
+class { 'dummy_service':
+  package_version    => '1.0.0',
+  ldap_server        => 'ldap.company.com',
+  mongodb_host       => 'mongodb.company.com',
+  repo_baseurl       => 'https://internal-repos.company.com/dummy_service',
+}
