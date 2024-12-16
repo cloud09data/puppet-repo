@@ -151,3 +151,46 @@ class { 'dummy_service':
   mongodb_host       => 'mongodb.company.com',
   repo_baseurl       => 'https://internal-repos.company.com/dummy_service',
 }
+
+
+class dummy_service::firewall {
+  # Only manage firewall if enabled
+  if $::dummy_service::manage_firewall {
+    # Main service port
+    firewalld_port { "allow_${::dummy_service::service_name}_main_port":
+      ensure   => present,
+      zone     => 'public',
+      port     => $::dummy_service::service_port,
+      protocol => $::dummy_service::service_protocol,
+    }
+
+    # LDAP port
+    firewalld_port { 'allow_ldap_port':
+      ensure   => present,
+      zone     => 'public',
+      port     => $::dummy_service::ldap_port,
+      protocol => 'tcp',
+    }
+
+    # MongoDB port
+    firewalld_port { 'allow_mongodb_port':
+      ensure   => present,
+      zone     => 'public',
+      port     => $::dummy_service::mongodb_port,
+      protocol => 'tcp',
+    }
+
+    # Additional service ports
+    firewalld_port { "allow_${::dummy_service::service_name}_admin_port":
+      ensure   => present,
+      zone     => 'public',
+      port     => $::dummy_service::service_admin_port,
+      protocol => 'tcp',
+    }
+
+    firewalld_port { "allow_${::dummy_service::service_name}_metrics_port":
+      ensure   => present,
+      zone     => 'public',
+      port     => $::dummy_service::service_metrics_port,
+      protocol => 'tcp',
+
